@@ -34,11 +34,17 @@ private[streams] class RedisRawStreaming[F[_]: FutureLift: Sync, K, V](
     val client: StatefulRedisConnection[K, V]
 ) extends RawStreaming[F, K, V] {
 
-  override def xAdd(key: K, body: Map[K, V], approxMaxlen: Option[Long] = None): F[MessageId] =
+  override def xAdd(key: K, body: Map[K, V], approxMaxlen: Option[Long], id: Option[String]): F[MessageId] =
     FutureLift[F]
       .lift {
-        val args = approxMaxlen.map(XAddArgs.Builder.maxlen(_).approximateTrimming(true))
-        client.async().xadd(key, args.orNull, body.asJava)
+        var args: XAddArgs = null
+
+        if (approxMaxlen.isDefined || id.isDefined) {
+          args = new XAddArgs()
+          approxMaxlen.foreach(args.maxlen(_).approximateTrimming(true))
+          id.foreach(args.id)
+        }
+        client.async().xadd(key, args, body.asJava)
       }
       .map(MessageId.apply)
 
