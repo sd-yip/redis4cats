@@ -28,6 +28,7 @@ trait RawStreaming[F[_], K, V] {
   def xAdd(
       key: K,
       body: Map[K, V],
+      id: Option[MessageId] = None,
       approxMaxlen: Option[Long] = None
   ): F[MessageId]
 
