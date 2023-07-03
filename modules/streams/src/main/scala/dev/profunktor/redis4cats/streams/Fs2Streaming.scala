@@ -79,6 +79,19 @@ class RedisStream[F[_]: Sync, K, V](rawStreaming: RedisRawStreaming[F, K, V]) ex
   override def append: Stream[F, XAddMessage[K, V]] => Stream[F, MessageId] =
     _.evalMap(msg => rawStreaming.xAdd(msg.key, msg.body, msg.id, msg.approxMaxlen))
 
+  override def list(
+      key: K,
+      chunkSize: Int,
+      start: Boundary[MessageId],
+      end: Boundary[MessageId],
+      count: Option[Long],
+      isAscending: Boolean
+  ): Stream[F, XReadMessage[K, V]] =
+    for {
+      list <- Stream.eval(rawStreaming.xRange(key, start, end, count, isAscending))
+      result <- Stream.fromIterator[F](list.iterator, chunkSize)
+    } yield result
+
   override def read(
       keys: Set[K],
       chunkSize: Int,

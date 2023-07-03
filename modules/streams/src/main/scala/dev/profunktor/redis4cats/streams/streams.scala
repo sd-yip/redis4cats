@@ -32,6 +32,14 @@ trait RawStreaming[F[_], K, V] {
       approxMaxlen: Option[Long] = None
   ): F[MessageId]
 
+  def xRange(
+      key: K,
+      start: Boundary[MessageId] = Boundary.Unbounded,
+      end: Boundary[MessageId] = Boundary.Unbounded,
+      count: Option[Long] = None,
+      isAscending: Boolean = true,
+  ): F[List[XReadMessage[K, V]]]
+
   def xRead(
       streams: Set[StreamingOffset[K]],
       block: Option[Duration] = Some(Duration.Zero),
@@ -41,6 +49,15 @@ trait RawStreaming[F[_], K, V] {
 
 trait Streaming[F[_], K, V] {
   def append: F[XAddMessage[K, V]] => F[MessageId]
+
+  def list(
+      key: K,
+      chunkSize: Int,
+      start: Boundary[MessageId] = Boundary.Unbounded,
+      end: Boundary[MessageId] = Boundary.Unbounded,
+      count: Option[Long] = None,
+      isAscending: Boolean = true
+  ): F[XReadMessage[K, V]]
 
   def read(
       keys: Set[K],

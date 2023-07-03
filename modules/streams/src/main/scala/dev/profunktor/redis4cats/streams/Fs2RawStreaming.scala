@@ -23,16 +23,31 @@ import cats.effect.kernel._
 import cats.syntax.functor._
 import dev.profunktor.redis4cats.JavaConversions._
 import dev.profunktor.redis4cats.effect.FutureLift
+import dev.profunktor.redis4cats.streams.data.Boundary.{ Exclusive, Inclusive, Unbounded }
 import dev.profunktor.redis4cats.streams.data._
 import dev.profunktor.redis4cats.streams.data.StreamingOffset.{ All, Custom, Latest }
 
-import io.lettuce.core.{ XAddArgs, XReadArgs }
+import io.lettuce.core.{ Limit, Range, StreamMessage, XAddArgs, XReadArgs }
 import io.lettuce.core.XReadArgs.StreamOffset
 import io.lettuce.core.api.StatefulRedisConnection
+
+private[streams] object RedisRawStreaming {
+  private val toRangeBoundary: Boundary[MessageId] => Range.Boundary[String] = {
+    case Unbounded     => Range.Boundary.unbounded()
+    case Inclusive(id) => Range.Boundary.including(id.value)
+    case Exclusive(id) => Range.Boundary.excluding(id.value)
+  }
+
+  private def toXReadMessages[K, V](list: java.util.List[StreamMessage[K, V]]) =
+    list.asScala.toList.map { msg =>
+      XReadMessage[K, V](MessageId(msg.getId), msg.getStream, msg.getBody.asScala.toMap)
+    }
+}
 
 private[streams] class RedisRawStreaming[F[_]: FutureLift: Sync, K, V](
     val client: StatefulRedisConnection[K, V]
 ) extends RawStreaming[F, K, V] {
+  import RedisRawStreaming._
 
   override def xAdd(key: K, body: Map[K, V], id: Option[MessageId], approxMaxlen: Option[Long]): F[MessageId] =
     FutureLift[F]
@@ -46,6 +61,21 @@ private[streams] class RedisRawStreaming[F[_]: FutureLift: Sync, K, V](
         client.async().xadd(key, args, body.asJava)
       }
       .map(MessageId.apply)
+
+  override def xRange(
+      key: K,
+      start: Boundary[MessageId],
+      end: Boundary[MessageId],
+      count: Option[Long],
+      isAscending: Boolean,
+  ): F[List[XReadMessage[K, V]]] =
+    FutureLift[F]
+      .lift {
+        val range = Range.from(toRangeBoundary(start), toRangeBoundary(end))
+        val limit = count.fold(Limit.unlimited)(Limit.from)
+        if (isAscending) client.async().xrange(key, range, limit) else client.async().xrevrange(key, range, limit)
+      }
+      .map(toXReadMessages)
 
   override def xRead(
       streams: Set[StreamingOffset[K]],
@@ -68,10 +98,6 @@ private[streams] class RedisRawStreaming[F[_]: FutureLift: Sync, K, V](
             client.async().xread(XReadArgs.Builder.block(block.toMillis).count(count), offsets: _*)
         }
       }
-      .map { list =>
-        list.asScala.toList.map { msg =>
-          XReadMessage[K, V](MessageId(msg.getId), msg.getStream, msg.getBody.asScala.toMap)
-        }
-      }
+      .map(toXReadMessages)
 
 }
