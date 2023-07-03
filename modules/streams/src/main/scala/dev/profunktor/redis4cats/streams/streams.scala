@@ -34,8 +34,8 @@ trait RawStreaming[F[_], K, V] {
 
   def xRange(
       key: K,
-      start: Boundary = Boundary.Unbounded,
-      end: Boundary = Boundary.Unbounded,
+      start: Boundary[MessageId] = Boundary.Unbounded,
+      end: Boundary[MessageId] = Boundary.Unbounded,
       count: Option[Long] = None
   ): F[List[XReadMessage[K, V]]]
 
@@ -52,8 +52,8 @@ trait Streaming[F[_], K, V] {
   def list(
       key: K,
       chunkSize: Int,
-      start: Boundary = Boundary.Unbounded,
-      end: Boundary = Boundary.Unbounded,
+      start: Boundary[MessageId] = Boundary.Unbounded,
+      end: Boundary[MessageId] = Boundary.Unbounded,
       count: Option[Long] = None
   ): F[XReadMessage[K, V]]
 

@@ -82,8 +82,8 @@ class RedisStream[F[_]: Sync, K, V](rawStreaming: RedisRawStreaming[F, K, V]) ex
   override def list(
       key: K,
       chunkSize: Int,
-      start: Boundary,
-      end: Boundary,
+      start: Boundary[MessageId],
+      end: Boundary[MessageId],
       count: Option[Long]
   ): Stream[F, XReadMessage[K, V]] =
     for {

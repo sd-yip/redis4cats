@@ -32,7 +32,7 @@ import io.lettuce.core.XReadArgs.StreamOffset
 import io.lettuce.core.api.StatefulRedisConnection
 
 private[streams] object RedisRawStreaming {
-  private val toRangeBoundary: Boundary => Range.Boundary[String] = {
+  private val toRangeBoundary: Boundary[MessageId] => Range.Boundary[String] = {
     case Unbounded     => Range.Boundary.unbounded()
     case Inclusive(id) => Range.Boundary.including(id.value)
     case Exclusive(id) => Range.Boundary.excluding(id.value)
@@ -62,7 +62,12 @@ private[streams] class RedisRawStreaming[F[_]: FutureLift: Sync, K, V](
       }
       .map(MessageId.apply)
 
-  override def xRange(key: K, start: Boundary, end: Boundary, count: Option[Long]): F[List[XReadMessage[K, V]]] =
+  override def xRange(
+      key: K,
+      start: Boundary[MessageId],
+      end: Boundary[MessageId],
+      count: Option[Long]
+  ): F[List[XReadMessage[K, V]]] =
     FutureLift[F]
       .lift {
         val range = Range.from(toRangeBoundary(start), toRangeBoundary(end))

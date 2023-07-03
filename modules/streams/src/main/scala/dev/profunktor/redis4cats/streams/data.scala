@@ -43,12 +43,12 @@ object data {
     case class Custom[K](key: K, offset: String) extends StreamingOffset[K]
   }
 
-  sealed trait Boundary
+  sealed trait Boundary[+A]
 
   object Boundary {
-    case object Unbounded extends Boundary
-    final case class Inclusive(id: MessageId) extends Boundary
-    final case class Exclusive(id: MessageId) extends Boundary
+    case object Unbounded extends Boundary[Nothing]
+    final case class Inclusive[A](value: A) extends Boundary[A]
+    final case class Exclusive[A](value: A) extends Boundary[A]
   }
 
 }
